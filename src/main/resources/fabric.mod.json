@@ -5,11 +5,11 @@
 	"name": "Cordlink",
 	"description": "Windows-only Discord voice bridge for Minecraft positional audio.",
 	"authors": [
-		"Me!"
+		"Dento"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": ""
+		"homepage": "https://github.com/Noted-Share/CordLink_Mod",
+		"sources": "https://github.com/Noted-Share/CordLink_Mod"
 	},
 	"license": "All Rights Reserved",
 	"icon": "assets/cordlink/icon.png",
