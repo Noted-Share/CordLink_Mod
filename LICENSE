@@ -1,0 +1,17 @@
+Copyright (c) 2026 The Cordlink authors.
+All rights reserved.
+
+This repository's original source code, original assets, and release artifacts may not be copied,
+modified, redistributed, sublicensed, or sold without prior written permission from the copyright holder.
+
+Permission to use this software is granted only through an official release distributed by the authors,
+unless separate written permission states otherwise.
+
+Third-party components bundled or referenced by this project remain under their own respective licenses.
+This includes, but is not limited to, JNA and OpenAL-related binaries.
+
+This software is provided "as is", without warranty of any kind, express or implied, including but not
+limited to the warranties of merchantability, fitness for a particular purpose, and noninfringement.
+In no event shall the authors or copyright holders be liable for any claim, damages, or other liability,
+whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the
+software or the use of other dealings in the software.

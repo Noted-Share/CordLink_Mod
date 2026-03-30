@@ -1,0 +1,14 @@
+{
+	"required": true,
+	"package": "com.cordlink.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"CordlinkMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

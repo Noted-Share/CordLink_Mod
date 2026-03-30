@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "com.cordlink.mixin.client",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"CordlinkClientMixin",
+		"GameMenuScreenMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

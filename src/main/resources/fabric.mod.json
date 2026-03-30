@@ -1,0 +1,38 @@
+{
+	"schemaVersion": 1,
+	"id": "cordlink",
+	"version": "${version}",
+	"name": "Cordlink",
+	"description": "Windows-only Discord voice bridge for Minecraft positional audio.",
+	"authors": [
+		"Me!"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": ""
+	},
+	"license": "All Rights Reserved",
+	"icon": "assets/cordlink/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.cordlink.Cordlink"
+		],
+		"client": [
+			"com.cordlink.CordlinkClient"
+		]
+	},
+	"mixins": [
+		"cordlink.mixins.json",
+		{
+			"config": "cordlink.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.16.0",
+		"minecraft": "${minecraft_dep}",
+		"java": ">=${java_version}",
+		"fabric-api": "*"
+	}
+}
