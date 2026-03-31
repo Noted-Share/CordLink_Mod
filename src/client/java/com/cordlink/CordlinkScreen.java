@@ -4,6 +4,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.GameMenuScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.text.Text;
 import net.minecraft.util.Util;
 
@@ -64,6 +65,24 @@ public class CordlinkScreen extends Screen {
                 refreshStatus();
             }
         }).dimensions(centerX + 5, y, 100, 20).build());
+
+        y += 28;
+
+        // Master volume slider (0% - 200%)
+        double initVal = mod.getMasterVolume() / 2.0;
+        addDrawableChild(new SliderWidget(centerX - 105, y, 210, 20, Text.literal("Volume: " + (int)(mod.getMasterVolume() * 100) + "%"), initVal) {
+            @Override
+            protected void updateMessage() {
+                int pct = (int)(this.value * 200);
+                this.setMessage(Text.literal("Volume: " + pct + "%"));
+            }
+
+            @Override
+            protected void applyValue() {
+                float vol = (float)(this.value * 2.0);
+                CordlinkClient.getInstance().setMasterVolume(vol);
+            }
+        });
 
         y += 28;
 

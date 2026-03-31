@@ -35,6 +35,7 @@ public class CordlinkClient implements ClientModInitializer {
 
     private volatile boolean writerRunning = false;
     private Thread rotationWriter;
+    private float masterVolume;
 
     private final DatagramPacket packet = new DatagramPacket(new byte[1], 1);
 
@@ -46,10 +47,19 @@ public class CordlinkClient implements ClientModInitializer {
     public boolean isSyncing() { return syncing; }
     public String getDiscordVariant() { return discordVariant; }
     public void setDiscordVariant(String variant) { this.discordVariant = variant; }
+    public float getMasterVolume() { return masterVolume; }
+    public void setMasterVolume(float volume) {
+        this.masterVolume = Math.max(0.0f, Math.min(2.0f, volume));
+        if (shmOpen) shmWriter.writeMasterVolume(this.masterVolume);
+        CordlinkConfig.masterVolume = this.masterVolume;
+        CordlinkConfig.save();
+    }
 
     @Override
     public void onInitializeClient() {
         instance = this;
+        CordlinkConfig.load();
+        masterVolume = CordlinkConfig.masterVolume;
         registerRenderHandler();
         detectExistingInjection();
 
@@ -61,6 +71,15 @@ public class CordlinkClient implements ClientModInitializer {
                 shmWriter.close();
                 shmOpen = false;
                 injected = false;
+            }
+        });
+
+        // Clear SHM sources when disconnecting from server
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            if (shmOpen) {
+                shmWriter.writeSources(new String[0], new float[0], new float[0], new float[0], 0);
+                shmWriter.commit();
+                LOGGER.info("Server disconnected, cleared SHM sources");
             }
         });
 
@@ -95,6 +114,7 @@ public class CordlinkClient implements ClientModInitializer {
                 if (player == localPlayer) continue;
                 String name = player.getName().getString();
                 if (!requestedNames.contains(name)) continue;
+                if (count >= ids.length) break;
                 ids[count] = name;
                 xs[count] = (float) player.getX();
                 ys[count] = (float) player.getY();
@@ -106,6 +126,7 @@ public class CordlinkClient implements ClientModInitializer {
         });
     }
 
+
     private void startRotationWriter() {
         writerRunning = true;
         rotationWriter = new Thread(() -> {
@@ -114,9 +135,9 @@ public class CordlinkClient implements ClientModInitializer {
                 if (client != null && client.player != null && shmOpen) {
                     float yaw = (float) Math.toRadians(client.player.getYaw());
                     float pitch = (float) Math.toRadians(client.player.getPitch());
-                    shmWriter.writeRotationAndCommit(yaw, pitch);
+                    shmWriter.writeLiveRotation(yaw, pitch);
                 }
-                Thread.onSpinWait();
+                try { Thread.sleep(2); } catch (InterruptedException e) { break; }
             }
         }, "cordlink-rotation-writer");
         rotationWriter.setDaemon(true);
@@ -137,6 +158,7 @@ public class CordlinkClient implements ClientModInitializer {
             injected = true;
             shmOpen = shmWriter.open();
             if (shmOpen) {
+                shmWriter.writeMasterVolume(masterVolume);
                 startRotationWriter();
                 LOGGER.info("Reconnected to existing DLL injection (shared memory OK)");
             }
@@ -179,21 +201,27 @@ public class CordlinkClient implements ClientModInitializer {
         String uuidStr = uuid.toString().replace("-", "");
         Thread.ofVirtual().start(() -> {
             try {
-                var req = HttpRequest.newBuilder()
-                        .uri(URI.create(API_BASE + "/api/link-by-uuid/" + uuidStr))
-                        .GET()
-                        .timeout(java.time.Duration.ofSeconds(5))
-                        .build();
-                var resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-                if (resp.statusCode() != 200) {
-                    syncing = false;
-                    client.execute(() -> msg(client, "\u00a7cNot linked. Use /link in Discord first."));
-                    return;
+                try {
+                    var req = HttpRequest.newBuilder()
+                            .uri(URI.create(API_BASE + "/api/link-by-uuid/" + uuidStr))
+                            .GET()
+                            .timeout(java.time.Duration.ofSeconds(5))
+                            .build();
+                    var resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+                    if (resp.statusCode() != 200) {
+                        syncing = false;
+                        client.execute(() -> msg(client, "\u00a7cNot linked. Use /link in Discord first."));
+                        return;
+                    }
+                } catch (Exception e) {
+                    client.execute(() -> msg(client, "\u00a7eCould not reach server, proceeding anyway..."));
                 }
+                client.execute(() -> doInject(client));
             } catch (Exception e) {
-                client.execute(() -> msg(client, "\u00a7eCould not reach server, proceeding anyway..."));
+                LOGGER.error("Injection failed", e);
+                syncing = false;
+                client.execute(() -> msg(client, "\u00a7cInjection failed unexpectedly."));
             }
-            client.execute(() -> doInject(client));
         });
         return 1;
     }
@@ -221,6 +249,7 @@ public class CordlinkClient implements ClientModInitializer {
             injected = true;
             shmOpen = shmWriter.open();
             if (shmOpen) {
+                shmWriter.writeMasterVolume(masterVolume);
                 startRotationWriter();
                 msg(client, "\u00a7aInjected (%d/%d, SHM OK)".formatted(success, pids.size()));
                 msg(client, "\u00a7eLeave and rejoin the voice channel for it to work properly.");
