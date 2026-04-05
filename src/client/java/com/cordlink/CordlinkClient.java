@@ -33,8 +33,6 @@ public class CordlinkClient implements ClientModInitializer {
     private final SharedPositionWriter shmWriter = new SharedPositionWriter();
     private boolean shmOpen = false;
 
-    private volatile boolean writerRunning = false;
-    private Thread rotationWriter;
     private float masterVolume;
 
     private final DatagramPacket packet = new DatagramPacket(new byte[1], 1);
@@ -48,6 +46,9 @@ public class CordlinkClient implements ClientModInitializer {
     public String getDiscordVariant() { return discordVariant; }
     public void setDiscordVariant(String variant) { this.discordVariant = variant; }
     public float getMasterVolume() { return masterVolume; }
+    public void writeLiveRotation(float yaw, float pitch) {
+        if (shmOpen) shmWriter.writeLiveRotation(yaw, pitch);
+    }
     public void setMasterVolume(float volume) {
         this.masterVolume = Math.max(0.0f, Math.min(2.0f, volume));
         if (shmOpen) shmWriter.writeMasterVolume(this.masterVolume);
@@ -60,6 +61,7 @@ public class CordlinkClient implements ClientModInitializer {
         instance = this;
         CordlinkConfig.load();
         masterVolume = CordlinkConfig.masterVolume;
+        LOGGER.info("[Config] onInitializeClient: masterVolume={}", masterVolume);
         registerRenderHandler();
         detectExistingInjection();
 
@@ -67,7 +69,6 @@ public class CordlinkClient implements ClientModInitializer {
             if (injected) {
                 LOGGER.info("Minecraft stopping, unloading DLL...");
                 sendText("Q");
-                stopRotationWriter();
                 shmWriter.close();
                 shmOpen = false;
                 injected = false;
@@ -87,7 +88,7 @@ public class CordlinkClient implements ClientModInitializer {
     }
 
     private void registerRenderHandler() {
-        WorldRenderEvents.START.register(ctx -> {
+        WorldRenderEvents.END.register(ctx -> {
             var client = MinecraftClient.getInstance();
             if (!injected || !shmOpen || client.player == null || client.world == null) return;
 
@@ -99,6 +100,7 @@ public class CordlinkClient implements ClientModInitializer {
             float yaw = (float) Math.toRadians(camera.getYaw());
             float pitch = (float) Math.toRadians(camera.getPitch());
 
+            shmWriter.writeLiveRotation(yaw, pitch);
             shmWriter.writeListener(lx, ly, lz, yaw, pitch);
 
             // Write only requested players' positions (DLL tells us which names it needs)
@@ -127,31 +129,6 @@ public class CordlinkClient implements ClientModInitializer {
     }
 
 
-    private void startRotationWriter() {
-        writerRunning = true;
-        rotationWriter = new Thread(() -> {
-            while (writerRunning) {
-                var client = MinecraftClient.getInstance();
-                if (client != null && client.player != null && shmOpen) {
-                    float yaw = (float) Math.toRadians(client.player.getYaw());
-                    float pitch = (float) Math.toRadians(client.player.getPitch());
-                    shmWriter.writeLiveRotation(yaw, pitch);
-                }
-                try { Thread.sleep(2); } catch (InterruptedException e) { break; }
-            }
-        }, "cordlink-rotation-writer");
-        rotationWriter.setDaemon(true);
-        rotationWriter.start();
-    }
-
-    private void stopRotationWriter() {
-        writerRunning = false;
-        if (rotationWriter != null) {
-            try { rotationWriter.join(100); } catch (InterruptedException ignored) {}
-            rotationWriter = null;
-        }
-    }
-
     private void detectExistingInjection() {
         if (shmWriter.exists()) {
             LOGGER.info("Existing shared memory detected, reconnecting...");
@@ -159,7 +136,6 @@ public class CordlinkClient implements ClientModInitializer {
             shmOpen = shmWriter.open();
             if (shmOpen) {
                 shmWriter.writeMasterVolume(masterVolume);
-                startRotationWriter();
                 LOGGER.info("Reconnected to existing DLL injection (shared memory OK)");
             }
         }
@@ -250,7 +226,6 @@ public class CordlinkClient implements ClientModInitializer {
             shmOpen = shmWriter.open();
             if (shmOpen) {
                 shmWriter.writeMasterVolume(masterVolume);
-                startRotationWriter();
                 msg(client, "\u00a7aInjected (%d/%d, SHM OK)".formatted(success, pids.size()));
                 msg(client, "\u00a7eLeave and rejoin the voice channel for it to work properly.");
             } else {
@@ -269,7 +244,6 @@ public class CordlinkClient implements ClientModInitializer {
             return 0;
         }
         sendText("Q");
-        stopRotationWriter();
         shmWriter.close();
         shmOpen = false;
         injected = false;

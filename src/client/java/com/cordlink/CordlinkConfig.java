@@ -13,12 +13,19 @@ public class CordlinkConfig {
     public static float masterVolume = 1.0f;
 
     public static void load() {
+        org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger("cordlink");
+        log.info("[Config] load() path={} exists={}", CONFIG_PATH, Files.exists(CONFIG_PATH));
         if (!Files.exists(CONFIG_PATH)) return;
         try (var in = Files.newInputStream(CONFIG_PATH)) {
             props.load(in);
-            masterVolume = Float.parseFloat(props.getProperty("masterVolume", "1.0"));
+            String raw = props.getProperty("masterVolume", "1.0");
+            log.info("[Config] raw masterVolume={}", raw);
+            masterVolume = Float.parseFloat(raw);
             masterVolume = Math.max(0.0f, Math.min(2.0f, masterVolume));
-        } catch (Exception ignored) {}
+            log.info("[Config] loaded masterVolume={}", masterVolume);
+        } catch (Exception e) {
+            log.warn("[Config] load failed", e);
+        }
     }
 
     public static void save() {
